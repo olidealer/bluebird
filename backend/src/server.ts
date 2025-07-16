@@ -1,5 +1,5 @@
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
@@ -29,7 +29,7 @@ app.use('/api/pdfs', pdfRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // Default route for health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'UP' });
 });
 
@@ -65,8 +65,6 @@ async function main() {
 main().catch(e => {
   console.error(e);
   (process as any).exit(1);
-}).finally(async () => {
-  await prisma.$disconnect();
 });
 
 

@@ -1,5 +1,6 @@
 {
   "name": "Rental Property Tax",
   "description": "Una aplicación web para ayudar a los propietarios de alquileres a calcular y gestionar sus impuestos mensuales sobre la renta y el IVA.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "prompt": ""
 }

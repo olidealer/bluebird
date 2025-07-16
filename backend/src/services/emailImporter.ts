@@ -1,12 +1,11 @@
-
 // NOTE: This is a placeholder file to demonstrate the logic for a future implementation.
 // A real implementation would use libraries like 'imap-simple' and 'mailparser'.
 // It would also require secure handling of user credentials (e.g., OAuth2 tokens for Gmail).
 
 import { parseInvoiceXML } from './xmlParser';
+import { Buffer } from 'buffer';
 
 // Fix for missing Node.js types
-declare const Buffer: any;
 declare const __dirname: string;
 
 

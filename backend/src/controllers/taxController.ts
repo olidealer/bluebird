@@ -76,7 +76,7 @@ export const addExpenses = async (req: Request, res: Response) => {
     let errorCount = 0;
     const addedExpenses = [];
 
-    for (const file of req.files) {
+    for (const file of req.files as Express.Multer.File[]) {
         const xmlString = file.buffer.toString('utf-8');
         const parsedData = parseInvoiceXML(xmlString);
 
