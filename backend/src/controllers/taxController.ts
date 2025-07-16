@@ -1,128 +1,161 @@
-
 import { Request, Response } from 'express';
-import { prisma } from '../server';
-import { parseInvoiceXML } from '../services/xmlParser';
+import 'multer';
+import prisma from '../db';
+import { XMLParser } from 'fast-xml-parser';
 
-/**
- * Fetches all income and expense data for a specific user, year, and month.
- */
-export const getMonthlyData = async (req: Request, res: Response) => {
-    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
+// --- Income Records ---
 
-    const { year, month } = req.params;
-    const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
+export const getTaxData = async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { year, month } = req.query;
 
-    const income = await prisma.incomeRecord.findMany({
-        where: { userId: req.user.id, yearMonth },
-        orderBy: { createdAt: 'desc' },
-    });
-
-    const expenses = await prisma.invoice.findMany({
-        where: { userId: req.user.id, yearMonth },
-        orderBy: { date: 'desc' },
-    });
-
-    res.json({ income, expenses });
-};
-
-/**
- * Adds a new income record for the authenticated user.
- */
-export const addIncome = async (req: Request, res: Response) => {
-    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
-
-    const { yearMonth } = req.params;
-    const { totalAmount, includesIva, description } = req.body;
-
-    const income = await prisma.incomeRecord.create({
-        data: {
-            yearMonth,
-            totalAmount: parseFloat(totalAmount),
-            includesIva,
-            description,
-            userId: req.user.id,
-        },
-    });
-
-    res.status(201).json(income);
-};
-
-/**
- * Deletes an income record by its ID.
- */
-export const deleteIncome = async (req: Request, res: Response) => {
-    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
-
-    const { id } = req.params;
-    const income = await prisma.incomeRecord.findUnique({ where: { id } });
-
-    if (income?.userId !== req.user.id) {
-        return res.status(401).json({ message: 'User not authorized to delete this record' });
+    if (!year || !month) {
+        return res.status(400).json({ message: 'Year and month are required' });
     }
 
-    await prisma.incomeRecord.delete({ where: { id } });
-    res.status(200).json({ id });
+    const startDate = new Date(parseInt(String(year)), parseInt(String(month)) - 1, 1);
+    const endDate = new Date(parseInt(String(year)), parseInt(String(month)), 0, 23, 59, 59);
+
+    try {
+        const incomeRecords = await prisma.incomeRecord.findMany({
+            where: {
+                userId,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            orderBy: { date: 'asc' },
+        });
+
+        const invoices = await prisma.invoice.findMany({
+            where: {
+                userId,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            orderBy: { date: 'asc' },
+        });
+
+        res.json({ incomes: incomeRecords, expenses: invoices });
+    } catch (error) {
+        console.error('Error fetching tax data:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
 };
 
-/**
- * Adds new expense records by parsing uploaded XML files.
- */
-export const addExpenses = async (req: Request, res: Response) => {
-    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
-    if (!req.files || !Array.isArray(req.files)) return res.status(400).json({ message: 'No files uploaded' });
+export const addIncomeRecord = async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { description, date, amount, vat } = req.body;
 
-    const { yearMonth } = req.params;
-    let successCount = 0;
-    let errorCount = 0;
-    const addedExpenses = [];
+    if (!description || !date || amount === undefined || vat === undefined) {
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
 
-    for (const file of req.files as Express.Multer.File[]) {
-        const xmlString = file.buffer.toString('utf-8');
-        const parsedData = parseInvoiceXML(xmlString);
+    try {
+        const newRecord = await prisma.incomeRecord.create({
+            data: {
+                userId,
+                description,
+                date: new Date(date),
+                amount: parseFloat(amount),
+                vat: parseFloat(vat),
+            },
+        });
+        res.status(201).json(newRecord);
+    } catch (error) {
+        console.error('Error adding income record:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
 
-        if (parsedData) {
-            try {
-                const newExpense = await prisma.invoice.create({
-                    data: {
-                        ...parsedData,
-                        date: new Date(parsedData.date),
-                        yearMonth,
-                        category: 'Sin categoría',
-                        userId: req.user.id,
-                    },
-                });
-                addedExpenses.push(newExpense);
-                successCount++;
-            } catch (dbError) {
-                console.error("DB Error adding expense:", dbError);
-                errorCount++;
+export const deleteIncomeRecord = async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    try {
+        const record = await prisma.incomeRecord.findUnique({ where: { id } });
+        if (!record || record.userId !== userId) {
+            return res.status(404).json({ message: 'Record not found or not authorized' });
+        }
+        await prisma.incomeRecord.delete({ where: { id } });
+        res.status(200).json({ message: 'Income record deleted' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// --- Expenses (Invoices) ---
+
+export const uploadInvoices = async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+        return res.status(400).json({ message: 'No files uploaded' });
+    }
+
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+    const createdInvoices = [];
+    const errors = [];
+
+    for (const file of files) {
+        try {
+            const xmlData = file.buffer.toString('utf-8');
+            const parsedXml = parser.parse(xmlData);
+            
+            // Note: This parsing logic is based on a common Costa Rican e-invoice structure.
+            // It might need adjustments for different XML schemas.
+            const invoiceData = parsedXml['FacturaElectronica'] || parsedXml['TiqueteElectronico'] || parsedXml['NotaCreditoElectronica'];
+
+            if (!invoiceData) {
+                errors.push({ fileName: file.originalname, message: 'Unsupported XML root element.' });
+                continue;
             }
-        } else {
-            errorCount++;
+
+            const issuerName = invoiceData.Emisor.Nombre;
+            const date = new Date(invoiceData.FechaEmision);
+            const totalAmount = parseFloat(invoiceData.ResumenFactura.TotalComprobante);
+            const vatAmount = parseFloat(invoiceData.ResumenFactura.TotalImpuesto || 0);
+
+            const newInvoice = await prisma.invoice.create({
+                data: {
+                    userId,
+                    issuerName,
+                    date,
+                    totalAmount,
+                    vatAmount,
+                    fileName: file.originalname,
+                },
+            });
+            createdInvoices.push(newInvoice);
+        } catch (error) {
+            console.error(`Error processing file ${file.originalname}:`, error);
+            errors.push({ fileName: file.originalname, message: 'Failed to parse or save XML file.' });
         }
     }
 
-    res.status(201).json({
-        message: `Carga completa. ${successCount} facturas agregadas, ${errorCount} fallaron.`,
-        addedExpenses,
-        successCount,
-        errorCount
-    });
+    if(createdInvoices.length > 0) {
+        res.status(201).json({ message: 'Files processed.', createdInvoices, errors });
+    } else {
+        res.status(400).json({ message: 'No invoices could be processed.', errors });
+    }
 };
 
-/**
- * Deletes an expense record by its ID.
- */
-export const deleteExpense = async (req: Request, res: Response) => {
-    if (!req.user) return res.status(401).json({ message: 'Not authorized' });
-
+export const deleteInvoice = async (req: Request, res: Response) => {
+    const userId = req.user!.id;
     const { id } = req.params;
-    const expense = await prisma.invoice.findUnique({ where: { id } });
 
-    if (expense?.userId !== req.user.id) {
-        return res.status(401).json({ message: 'User not authorized to delete this record' });
+    try {
+        const invoice = await prisma.invoice.findUnique({ where: { id } });
+        if (!invoice || invoice.userId !== userId) {
+            return res.status(404).json({ message: 'Invoice not found or not authorized' });
+        }
+        await prisma.invoice.delete({ where: { id } });
+        res.status(200).json({ message: 'Invoice deleted' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
     }
-
-    await prisma.invoice.delete({ where: { id } });
-    res.status(200).json({ id });
 };

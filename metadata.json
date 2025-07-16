@@ -1,6 +1,5 @@
 {
-  "name": "Rental Property Tax",
-  "description": "Una aplicación web para ayudar a los propietarios de alquileres a calcular y gestionar sus impuestos mensuales sobre la renta y el IVA.",
-  "requestFramePermissions": [],
-  "prompt": ""
+  "name": "Rental Property Tax Manager",
+  "description": "A full-stack web application to help rental property owners calculate and manage their monthly income and VAT taxes. Orchestrated with Docker.",
+  "requestFramePermissions": []
 }

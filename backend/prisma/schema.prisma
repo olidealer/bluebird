@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  username           String              @unique
+  password           String
+  invoices           Invoice[]
+  incomeRecords      IncomeRecord[]
+  appearanceSettings AppearanceSettings?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  issuerName  String
+  date        DateTime
+  totalAmount Float
+  vatAmount   Float
+  fileName    String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime @default(now())
+}
+
+model IncomeRecord {
+  id          String   @id @default(cuid())
+  description String
+  date        DateTime
+  amount      Float
+  vat         Float
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime @default(now())
+}
+
+model AppearanceSettings {
+  id       String @id @default(cuid())
+  theme    String @default("system") // 'light', 'dark', 'system'
+  language String @default("en") // 'en', 'es'
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String @unique
+}

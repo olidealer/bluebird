@@ -1,74 +1,85 @@
 
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import * as process from 'process';
+import prisma from './db';
 
-import authRoutes from './routes/auth';
-import userRoutes from './routes/user';
-import taxRoutes from './routes/taxes';
-import pdfRoutes from './routes/pdfs';
-import settingsRoutes from './routes/settings';
+import authRoutes from './routes/authRoutes';
+import taxRoutes from './routes/taxRoutes';
+import userRoutes from './routes/userRoutes';
 
-// Load environment variables
 dotenv.config();
 
-export const prisma = new PrismaClient();
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Middlewares
+// --- Middleware ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes
+// --- API Routes ---
 app.use('/api/auth', authRoutes);
+app.use('/api/tax-data', taxRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/taxes', taxRoutes);
-app.use('/api/pdfs', pdfRoutes);
-app.use('/api/settings', settingsRoutes);
-
-// Default route for health check
-app.get('/api/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'UP' });
-});
-
-// Create a default user and settings on first startup
-async function main() {
-  // Seed database
-  const demoUser = await prisma.user.findUnique({ where: { username: 'demo' }});
-  if (!demoUser) {
-    const bcrypt = await import('bcryptjs');
-    console.log('Creating demo user...');
-    await prisma.user.create({
-      data: {
-        username: 'demo',
-        email: 'demo@example.com',
-        password: await bcrypt.hash('demo', 10)
-      }
-    });
-  }
-
-  const settings = await prisma.appearanceSettings.findFirst();
-  if (!settings) {
-    console.log('Creating default appearance settings...');
-    await prisma.appearanceSettings.create({
-      data: {
-        appName: "Rental Property Tax",
-        logoUrl: "/logo.svg", // A default logo in frontend/public
-        primaryColor: "#007A87",
-      }
-    });
-  }
-}
-
-main().catch(e => {
-  console.error(e);
-  (process as any).exit(1);
-});
 
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// --- Seeding Logic ---
+const seedDatabase = async () => {
+    try {
+        const demoUser = await prisma.user.findUnique({
+            where: { username: 'demo' },
+        });
+
+        if (!demoUser) {
+            console.log('Demo user not found, creating one...');
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash('demo', salt);
+
+            await prisma.user.create({
+                data: {
+                    username: 'demo',
+                    password: hashedPassword,
+                    appearanceSettings: {
+                        create: {
+                            theme: 'dark',
+                            language: 'en',
+                        },
+                    },
+                },
+            });
+            console.log('Demo user created successfully.');
+        } else {
+            console.log('Demo user already exists.');
+        }
+    } catch (error) {
+        console.error('Error during database seeding:', error);
+    }
+};
+
+// --- Server Startup ---
+const startServer = async () => {
+    try {
+        await prisma.$connect();
+        console.log('Database connected successfully.');
+        
+        await seedDatabase();
+
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error('Failed to connect to the database', error);
+        process.exit(1);
+    }
+};
+
+startServer();
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    await prisma.$disconnect();
+    process.exit(0);
 });

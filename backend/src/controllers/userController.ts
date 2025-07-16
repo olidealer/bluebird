@@ -1,76 +1,44 @@
 
 import { Request, Response } from 'express';
-import { prisma } from '../server';
-import bcrypt from 'bcryptjs';
+import prisma from '../db';
 
-/**
- * Gets the profile of the currently authenticated user.
- */
-export const getUserProfile = async (req: Request, res: Response) => {
-    if (!req.user) {
-        return res.status(401).json({ message: 'Not authorized' });
-    }
-
-    const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
-        select: { id: true, username: true, email: true, createdAt: true },
-    });
-
-    if (user) {
-        res.json(user);
-    } else {
-        res.status(404).json({ message: 'User not found' });
+export const getAppearanceSettings = async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    try {
+        const settings = await prisma.appearanceSettings.findUnique({
+            where: { userId },
+        });
+        if (!settings) {
+            // Create default settings if they don't exist
+            const newSettings = await prisma.appearanceSettings.create({
+                data: {
+                    userId,
+                    theme: 'system',
+                    language: 'en'
+                }
+            });
+            return res.json(newSettings);
+        }
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
-/**
- * Updates the profile (username, email) of the authenticated user.
- */
-export const updateUserProfile = async (req: Request, res: Response) => {
-    if (!req.user) {
-        return res.status(401).json({ message: 'Not authorized' });
-    }
-
-    const { username, email } = req.body;
+export const updateAppearanceSettings = async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { theme, language } = req.body;
 
     try {
-        const updatedUser = await prisma.user.update({
-            where: { id: req.user.id },
-            data: { username, email },
-            select: { id: true, username: true, email: true },
+        const updatedSettings = await prisma.appearanceSettings.update({
+            where: { userId },
+            data: {
+                theme,
+                language,
+            },
         });
-        res.json(updatedUser);
+        res.json(updatedSettings);
     } catch (error) {
-        res.status(400).json({ message: 'Error updating profile. Username or email may be taken.' });
-    }
-};
-
-/**
- * Changes the password for the authenticated user.
- */
-export const changePassword = async (req: Request, res: Response) => {
-    if (!req.user) {
-        return res.status(401).json({ message: 'Not authorized' });
-    }
-    
-    const { oldPassword, newPassword } = req.body;
-    if (!oldPassword || !newPassword) {
-        return res.status(400).json({ message: 'Please provide old and new passwords.' });
-    }
-    
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-
-    if (user && (await bcrypt.compare(oldPassword, user.password))) {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-        await prisma.user.update({
-            where: { id: req.user.id },
-            data: { password: hashedPassword },
-        });
-        
-        res.json({ message: 'Password updated successfully' });
-    } else {
-        res.status(400).json({ message: 'Old password is incorrect' });
+        res.status(500).json({ message: 'Server error' });
     }
 };

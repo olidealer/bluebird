@@ -1,87 +1,70 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../services/api';
-import { jwtDecode } from 'jwt-decode';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import api from '../services/api';
+import { AuthState, User, AppearanceSettings } from '../types';
 
-interface AuthContextType {
-    isAuthenticated: boolean;
-    user: { id: string; username: string; } | null;
-    isLoading: boolean;
-    login: (user: string, pass: string) => Promise<void>;
-    logout: () => void;
+interface AuthContextType extends AuthState {
+  login: (token: string, user: User, settings: AppearanceSettings) => void;
+  logout: () => void;
+  setSettings: (settings: AppearanceSettings) => void;
 }
 
-interface DecodedToken {
-    id: string;
-    username: string;
-    exp: number;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<{ id: string; username: string; } | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const navigate = useNavigate();
+  const [auth, setAuth] = useState<AuthState>({
+    token: localStorage.getItem('token'),
+    user: JSON.parse(localStorage.getItem('user') || 'null'),
+    settings: JSON.parse(localStorage.getItem('settings') || 'null'),
+    isAuthenticated: !!localStorage.getItem('token'),
+    loading: true,
+  });
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const decoded = jwtDecode<DecodedToken>(token);
-                // Check if token is expired
-                if (decoded.exp * 1000 > Date.now()) {
-                    setUser({ id: decoded.id, username: decoded.username || 'demo' });
-                    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-                } else {
-                    // Token expired, clear it
-                    localStorage.removeItem('token');
-                }
-            } catch (error) {
-                console.error("Invalid token");
-                localStorage.removeItem('token');
-            }
-        }
-        setIsLoading(false);
-    }, []);
+  useEffect(() => {
+    // This effect ensures we are truly unauthenticated if token is invalid,
+    // although ProtectedRoute handles the UI part.
+    setAuth(prev => ({
+        ...prev,
+        loading: false
+    }));
+  }, []);
 
-    const login = async (username: string, pass: string): Promise<void> => {
-        const { data } = await api.post('/auth/login', { username, password: pass });
-        if (data.token) {
-            localStorage.setItem('token', data.token);
-            api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-            setUser({ id: data.id, username: data.username });
-            navigate('/');
-        }
-    };
+  const login = (token: string, user: User, settings: AppearanceSettings) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('settings', JSON.stringify(settings));
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    setAuth({
+      token,
+      user,
+      settings,
+      isAuthenticated: true,
+      loading: false,
+    });
+  };
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        delete api.defaults.headers.common['Authorization'];
-        setUser(null);
-        navigate('/login');
-    };
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('settings');
+    delete api.defaults.headers.common['Authorization'];
+    setAuth({
+      token: null,
+      user: null,
+      settings: null,
+      isAuthenticated: false,
+      loading: false,
+    });
+  };
 
-    const value = {
-        isAuthenticated: !!user,
-        user,
-        isLoading,
-        login,
-        logout,
-    };
+  const setSettings = (settings: AppearanceSettings) => {
+    localStorage.setItem('settings', JSON.stringify(settings));
+    setAuth(prev => ({...prev, settings}));
+  };
 
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
-    );
-};
-
-export const useAuth = (): AuthContextType => {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
+  return (
+    <AuthContext.Provider value={{ ...auth, login, logout, setSettings }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

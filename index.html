@@ -1,59 +1,30 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rental Property Tax</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'brand-primary': '#007A87',
-              'brand-secondary': '#FF5A5F',
-              'brand-light': '#F7F7F7',
-              'brand-dark': '#484848',
-            }
-          }
-        }
-      }
-    </script>
 <script type="importmap">
 {
   "imports": {
+    "@prisma/client": "https://esm.sh/@prisma/client@^6.12.0",
+    "express": "https://esm.sh/express@^5.1.0",
+    "jsonwebtoken": "https://esm.sh/jsonwebtoken@^9.0.2",
+    "bcryptjs": "https://esm.sh/bcryptjs@^3.0.2",
+    "fast-xml-parser": "https://esm.sh/fast-xml-parser@^5.2.5",
+    "multer": "https://esm.sh/multer@^2.0.1",
+    "dotenv": "https://esm.sh/dotenv@^17.2.0",
+    "cors": "https://esm.sh/cors@^2.8.5",
+    "vite": "https://esm.sh/vite@^7.0.4",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^4.6.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
     "react/": "https://esm.sh/react@^19.1.0/",
     "react": "https://esm.sh/react@^19.1.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
     "react-router-dom": "https://esm.sh/react-router-dom@^7.6.3",
+    "i18next": "https://esm.sh/i18next@^25.3.2",
+    "i18next-browser-languagedetector": "https://esm.sh/i18next-browser-languagedetector@^8.2.0",
+    "react-i18next": "https://esm.sh/react-i18next@^15.6.0",
+    "axios": "https://esm.sh/axios@^1.10.0",
     "jspdf": "https://esm.sh/jspdf@^3.0.1",
     "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.2",
     "lucide-react": "https://esm.sh/lucide-react@^0.525.0",
-    "react-dropzone": "https://esm.sh/react-dropzone@^14.3.8",
-    "@prisma/client": "https://esm.sh/@prisma/client@^6.11.1",
-    "express": "https://esm.sh/express@^5.1.0",
-    "cors": "https://esm.sh/cors@^2.8.5",
-    "dotenv": "https://esm.sh/dotenv@^17.2.0",
-    "jsonwebtoken": "https://esm.sh/jsonwebtoken@^9.0.2",
-    "bcryptjs": "https://esm.sh/bcryptjs@^3.0.2",
-    "multer": "https://esm.sh/multer@^2.0.1",
-    "fast-xml-parser": "https://esm.sh/fast-xml-parser@^5.2.5",
-    "axios": "https://esm.sh/axios@^1.10.0",
-    "i18next-browser-languagedetector": "https://esm.sh/i18next-browser-languagedetector@^8.2.0",
-    "i18next": "https://esm.sh/i18next@^25.3.2",
-    "react-i18next": "https://esm.sh/react-i18next@^15.6.0",
-    "jwt-decode": "https://esm.sh/jwt-decode@^4.0.0",
-    "vite": "https://esm.sh/vite@^7.0.4",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^4.6.0",
-    "buffer": "https://esm.sh/buffer@^6.0.3"
+    "process": "https://esm.sh/process@^0.11.10"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
-</head>
-<body class="bg-brand-light">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-</body>
-</html>
+<script type="module" src="/index.tsx"></script>

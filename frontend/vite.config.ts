@@ -6,14 +6,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    // Esto es necesario para exponer el servidor a la máquina host en Docker
-    host: '0.0.0.0', 
-    port: 5173,
-    // Proxy para las solicitudes de API al servicio de backend
+    port: 3000,
     proxy: {
+      // Proxying API requests from /api to the backend service
+      // This is crucial for the frontend container to communicate with the backend container
       '/api': {
-        target: 'http://backend:5000', // El servicio de backend como se define en docker-compose.yml
+        target: 'http://backend:5000', // The service name and port from docker-compose.yml
         changeOrigin: true,
+        secure: false,
       },
     },
   },
